@@ -1,7 +1,42 @@
 import SwiftUI
+import FirebaseAnalytics
+import FirebaseCrashlytics
 
 struct ContentView: View {
     @State private var counter = 0
+    
+    // Função para log de evento personalizado
+    private func logCounterIncrement() {
+        Analytics.logEvent("counter_increment", parameters: [
+            "counter_value": counter as NSNumber,
+            "timestamp": Date().timeIntervalSince1970 as NSNumber
+        ])
+    }
+    
+    // Função para log de exceção controlada
+    private func logControledException() {
+        do {
+            throw NSError(
+                domain: "ControlledTestException",
+                code: -1,
+                userInfo: [
+                    NSLocalizedDescriptionKey: "Controlled test exception"
+                ]
+            )
+        } catch {
+            // Log no Crashlytics
+            Crashlytics.crashlytics().record(error: error)
+            
+            // Log no Analytics
+            Analytics.logEvent("controlled_exception", parameters: [
+                "error_description": error.localizedDescription,
+                "error_code": error._code as NSNumber,
+                "timestamp": Date().timeIntervalSince1970 as NSNumber
+            ])
+            
+            print("Caught exception: \(error.localizedDescription)")
+        }
+    }
     
     var body: some View {
         VStack {
@@ -28,6 +63,7 @@ struct ContentView: View {
                     
                     Button("Increment Counter") {
                         counter += 1
+                        logCounterIncrement()
                     }
                     .foregroundColor(.white)
                     .padding()
@@ -46,14 +82,7 @@ struct ContentView: View {
                         .font(.headline)
                     
                     Button("Generate Controlled Exception") {
-                        do {
-                            throw NSError(domain: "Controlled test exception",
-                                        code: -1,
-                                        userInfo: nil)
-                        } catch {
-                            print("Caught exception: \(error.localizedDescription)")
-                            // Will add Crashlytics logging here later
-                        }
+                        logControledException()
                     }
                     .foregroundColor(.white)
                     .padding()
@@ -92,6 +121,14 @@ struct ContentView: View {
             .padding()
             
             Spacer()
+        }
+        .onAppear {
+            // Log quando o app é aberto
+            Analytics.logEvent(AnalyticsEventAppOpen, parameters: [
+                "platform": "iOS",
+                "version": Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "unknown",
+                "timestamp": Date().timeIntervalSince1970 as NSNumber
+            ])
         }
     }
 }
